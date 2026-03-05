@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The State of the Smart Ring: An Oura Product Teardown</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0D1117;--ink-mid:#3D4A5C;--ink-muted:#6B7A90;
+  --rule:#E4E8F0;--bg:#F7F4EF;--white:#fff;
+  --teal:#2D7D8A;--teal-deep:#1A5C67;--teal-s:#E8F4F6;
+  --forest:#2C4A3E;--forest-s:#E6EDE9;
+  --amber:#92400E;--amber-s:#FEF3C7;
+  --blue:#1648C8;--blue-s:#EEF2FF;
+  --red-s:#FEE2E2;--gray-s:#F1F5F9;
+  --serif:'Lora',Georgia,serif;
+  --sans:'Sora',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+}
+
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;min-height:100vh}
+
+/* ── LAYOUT ── */
+.page{max-width:760px;margin:0 auto;padding:60px 24px 100px}
+.wide{max-width:980px;margin:0 auto;padding:0 24px}
+
+/* ── MASTHEAD ── */
+.masthead{border-bottom:1px solid var(--rule);padding-bottom:32px;margin-bottom:48px}
+.pub-name{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.pub-name::before{content:'';display:block;width:24px;height:2px;background:var(--teal)}
+h1{font-family:var(--serif);font-size:clamp(28px,4vw,42px);font-weight:600;
+  color:var(--ink);line-height:1.2;margin-bottom:14px;letter-spacing:-.02em}
+.deck{font-size:18px;color:var(--ink-mid);line-height:1.5;margin-bottom:24px;
+  font-style:italic;font-family:var(--serif)}
+.meta{font-size:12px;color:var(--ink-muted);display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.meta-dot{width:3px;height:3px;border-radius:50%;background:var(--rule);flex-shrink:0}
+.tag{display:inline-block;padding:3px 9px;border-radius:4px;
+  background:var(--teal-s);color:var(--teal-deep);font-size:11px;font-weight:600}
+
+/* ── BODY TEXT ── */
+.prose{font-size:17px;line-height:1.8;color:var(--ink)}
+.prose p{margin-bottom:1.4em}
+.prose p:last-child{margin-bottom:0}
+
+/* ── SECTION HEADERS ── */
+.section{margin:56px 0 28px}
+.section-num{font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--teal);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.section-num::before{content:'';display:block;width:16px;height:2px;background:var(--teal)}
+h2{font-family:var(--serif);font-size:26px;font-weight:600;color:var(--ink);
+  line-height:1.3;letter-spacing:-.01em}
+
+/* ── PULL QUOTE ── */
+.pullquote{border-left:3px solid var(--teal);padding:16px 24px;margin:36px 0;
+  background:var(--teal-s);border-radius:0 8px 8px 0}
+.pullquote p{font-family:var(--serif);font-size:20px;font-style:italic;
+  color:var(--teal-deep);line-height:1.5;margin:0}
+
+/* ── PHASE BLOCKS ── */
+.phases{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:32px 0}
+.phase{padding:20px;border-radius:10px;border:1px solid var(--rule);background:var(--white)}
+.phase.active{border-color:var(--teal);background:var(--teal-s)}
+.phase-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:6px;color:var(--ink-muted)}
+.phase.active .phase-label{color:var(--teal-deep)}
+.phase-title{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:6px}
+.phase-desc{font-size:12px;color:var(--ink-muted);line-height:1.5}
+.phase.active .phase-title{color:var(--teal-deep)}
+.phase-badge{display:inline-block;margin-top:8px;font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:3px;background:var(--teal);color:#fff}
+
+/* ── FAILURE MODES ── */
+.failures{margin:28px 0;display:flex;flex-direction:column;gap:16px}
+.failure{padding:18px 20px;border-radius:10px;background:var(--white);
+  border:1px solid var(--rule);display:flex;gap:16px;align-items:flex-start}
+.failure-icon{font-size:20px;flex-shrink:0;margin-top:2px}
+.failure-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px}
+.failure-body{font-size:13.5px;color:var(--ink-mid);line-height:1.6}
+
+/* ── PERSONA CARDS ── */
+.personas{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:32px 0}
+.persona{padding:22px;border-radius:12px;background:var(--white);border:1px solid var(--rule)}
+.persona-age{font-size:28px;font-weight:700;font-family:var(--serif);color:var(--teal);margin-bottom:2px}
+.persona-label{font-size:11px;font-weight:600;color:var(--ink-muted);letter-spacing:.08em;
+  text-transform:uppercase;margin-bottom:14px}
+.persona-need{font-size:13px;color:var(--ink);line-height:1.6;margin-bottom:12px}
+.persona-tag{display:inline-block;padding:3px 8px;border-radius:4px;
+  font-size:11px;font-weight:600;margin:2px 2px 0 0}
+.pt-blue{background:var(--blue-s);color:var(--blue)}
+.pt-teal{background:var(--teal-s);color:var(--teal-deep)}
+.pt-forest{background:var(--forest-s);color:var(--forest)}
+
+/* ── BUILDING BLOCKS ── */
+.blocks{margin:24px 0;display:flex;flex-direction:column;gap:10px}
+.block{display:flex;gap:14px;padding:16px 18px;background:var(--white);
+  border-radius:8px;border:1px solid var(--rule);align-items:flex-start}
+.block-num{font-family:var(--mono);font-size:12px;font-weight:500;
+  color:var(--teal);background:var(--teal-s);padding:3px 8px;
+  border-radius:4px;flex-shrink:0;margin-top:2px}
+.block-title{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.block-body{font-size:13px;color:var(--ink-mid);line-height:1.6}
+
+/* ── STACK DIAGRAM ── */
+.stack{margin:32px 0;display:flex;flex-direction:column;gap:3px;max-width:480px}
+.stack-row{padding:14px 20px;border-radius:8px;display:flex;justify-content:space-between;
+  align-items:center;font-size:13px;font-weight:600}
+.stack-row .players{font-size:11px;font-weight:400;opacity:.7}
+.sr-hardware{background:var(--forest-s);color:var(--forest)}
+.sr-data{background:var(--amber-s);color:var(--amber)}
+.sr-intel{background:var(--teal-s);color:var(--teal-deep)}
+.sr-intel.highlight{background:var(--teal);color:#fff}
+.sr-intel.highlight .players{opacity:.85}
+.stack-arrow{text-align:center;color:var(--ink-muted);font-size:16px;line-height:1}
+
+/* ── POV SECTION ── */
+.pov-header{background:var(--forest);color:#fff;border-radius:12px;
+  padding:28px 32px;margin:56px 0 32px}
+.pov-header h2{font-family:var(--serif);font-size:24px;font-weight:600;color:#fff;margin-bottom:8px}
+.pov-header p{font-size:14px;color:rgba(255,255,255,.75);margin:0}
+
+/* ── SECOND RISE CALLOUT ── */
+.builder-note{background:linear-gradient(135deg,var(--teal-s),var(--forest-s));
+  border-radius:12px;padding:24px 28px;margin:40px 0;
+  border:1px solid rgba(44,74,62,.2);display:flex;gap:20px;align-items:flex-start}
+.builder-icon{font-size:32px;flex-shrink:0}
+.builder-title{font-size:15px;font-weight:700;color:var(--forest);margin-bottom:6px}
+.builder-body{font-size:14px;color:var(--ink-mid);line-height:1.6}
+.builder-link{display:inline-block;margin-top:10px;font-size:12px;font-weight:600;
+  color:var(--teal-deep);text-decoration:none;border-bottom:1px solid var(--teal)}
+
+/* ── CONCLUSION ── */
+.conclusion{border-top:2px solid var(--teal);padding-top:40px;margin-top:56px}
+.conclusion-hed{font-family:var(--serif);font-size:22px;font-weight:600;
+  color:var(--ink);margin-bottom:20px}
+
+/* ── BYLINE ── */
+.byline{margin-top:56px;padding-top:28px;border-top:1px solid var(--rule);
+  display:flex;gap:16px;align-items:flex-start}
+.byline-dot{width:44px;height:44px;border-radius:50%;background:var(--teal);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:16px;color:#fff;flex-shrink:0}
+.byline-name{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:2px}
+.byline-bio{font-size:13px;color:var(--ink-muted);line-height:1.5}
+
+/* ── CHART WRAPPER ── */
+.chart-section{background:var(--white);border-radius:16px;
+  border:1px solid var(--rule);margin:36px 0;overflow:hidden}
+.chart-inner{padding:36px 40px 28px}
+
+/* chart internals (from original) */
+.eyebrow-c{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--blue);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.eyebrow-c::before{content:'';display:block;width:18px;height:2px;background:var(--blue);border-radius:2px}
+.chart-h1{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--ink);
+  line-height:1.3;margin-bottom:4px}
+.chart-sub{font-size:11px;color:var(--ink-muted);margin-bottom:18px}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:7px 15px;border-radius:8px;font-size:11.5px;font-weight:600;
+  cursor:pointer;border:1.5px solid var(--rule);background:var(--white);
+  color:var(--ink-muted);transition:all .15s}
+.tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tab:hover:not(.active){border-color:var(--blue);color:var(--blue)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:6px;align-items:center}
+.li{display:flex;align-items:center;gap:6px;font-size:11px}
+.ll{width:22px;height:2.5px;border-radius:2px;flex-shrink:0}
+.ll.dash{background:repeating-linear-gradient(90deg,currentColor 0,currentColor 5px,transparent 5px,transparent 9px)}
+.ll.band{width:22px;height:10px;border-radius:3px;opacity:.35}
+.fcst-row{display:flex;justify-content:flex-end;margin-bottom:3px}
+.fcst-label{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--blue);opacity:.4}
+.chart-wrap{height:340px;position:relative;margin-bottom:20px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.chip{display:inline-flex;align-items:flex-start;gap:7px;
+  padding:8px 11px;border-radius:8px;font-size:11px;line-height:1.45}
+.chip-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+.chip b{display:block;font-weight:600;margin-bottom:1px}
+.chip.red{background:var(--red-s);color:#7F1D1D}
+.chip.amber{background:var(--amber-s);color:#78350F}
+.chip.teal{background:var(--teal-s);color:#064E3B}
+.chip.blue{background:var(--blue-s);color:#1E3A8A}
+.chip.gray{background:var(--gray-s);color:#334155}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);
+  border:1px solid var(--rule);border-radius:10px;overflow:hidden;
+  gap:1px;background:var(--rule);margin-bottom:14px}
+.sc{background:var(--white);padding:13px 16px}
+.sn{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.02em;line-height:1;margin-bottom:3px}
+.badge{display:inline-block;font-size:9px;font-weight:700;
+  padding:2px 5px;border-radius:4px;margin-left:3px;vertical-align:middle}
+.up{background:var(--teal-s);color:#065F46}
+.down{background:var(--red-s);color:#991B1B}
+.neu{background:var(--blue-s);color:var(--blue)}
+.sl{font-size:10px;color:var(--ink-muted)}
+.model-box{background:var(--gray-s);border-radius:8px;padding:12px 16px;
+  margin-bottom:14px;font-size:11px;color:var(--ink-mid);line-height:1.7;display:none}
+.model-box.show{display:block}
+.model-toggle{font-size:11px;color:var(--blue);cursor:pointer;
+  text-decoration:underline;margin-bottom:8px;display:inline-block}
+.chart-source{font-size:10px;color:#B0BAC8;line-height:1.7;padding:0 0 4px}
+.src-v{color:#065F46;font-weight:600}
+.src-e{color:#92400E;font-weight:600}
+
+@media(max-width:640px){
+  .phases,.personas{grid-template-columns:1fr}
+  .chart-inner{padding:24px 20px 20px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  h1{font-size:26px}
+  .pov-header{padding:20px}
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- MASTHEAD -->
+  <div class="masthead">
+    <div class="pub-name">Her Health Stack</div>
+    <h1>The State of the Smart Ring: An Oura Product Teardown</h1>
+    <div class="deck">Oura built the world's best health data collection layer. The next frontier is the intelligence layer, and whoever builds it best wins the category.</div>
+    <div class="meta">
+      <span>Karen Kagoo</span>
+      <span class="meta-dot"></span>
+      <span>March 2026</span>
+      <span class="meta-dot"></span>
+      <span class="tag">Product Analysis</span>
+      <span class="tag">Wearables</span>
+      <span class="tag">AI Health</span>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="prose">
+    <p>Oura has done something almost no consumer hardware company achieves. It built category dominance from scratch, without platform distribution, without an ecosystem to lean on, without the manufacturing scale of a Samsung or Apple. The growth numbers are real, the hardware is excellent, and the research is serious.</p>
+    <p>But ten years in, Oura is still primarily a measurement system. It collects an extraordinary volume of physiological signal (sleep stages, HRV, skin temperature, respiratory rate, stress, activity) and surfaces it through scores and charts. What it does not yet do reliably is tell you what to do about any of it, anticipate what matters before you notice it, or understand you as an individual rather than a deviation from a statistical baseline.</p>
+    <p>The gap between measurement and intelligence is the most important product problem in wearables right now. Oura is best positioned to close it. No other company has the longitudinal data, the clinical depth, and the hardware compliance to do it better. But that position is not guaranteed, and the window is narrowing.</p>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <div class="section-num">01</div>
+    <h2>The Growth Curve: What Actually Drove It</h2>
+  </div>
+
+  <div class="prose">
+    <p>Oura was founded in Finland in 2013. It took eleven years to sell its first 2.5 million rings. It sold the next 3 million in roughly fourteen months. More than half of all rings ever sold came in the last year alone.</p>
+    <p>Revenue followed the same curve. Based on Oura's public disclosure that 2024 revenue was "more than double" 2023, and analyst estimates placing 2023 in the mid-hundreds of millions, 2024 revenue exceeded $500M. CEO guidance points toward $1B in 2025. The $900M Series E in October 2025 at an $11B valuation, more than double the prior round, reflects real business performance, not narrative momentum.</p>
+    <p>Understanding what drove the inflection matters, because the story Oura tells, centered on women's health features and clinical partnerships, does not align with the timing. The timing points to a distribution-led inflection: Oura expanded into Target and Amazon in April 2024 and launched the Oura Ring 4 in October 2024. Those events coincided with the growth curve bending sharply, more than any single feature launch.</p>
+    <p>This mirrors what happened with Dyson and Peloton. Both were hardware inflections driven by retail availability, not product breakthroughs. The product did not fundamentally change. The places you could buy it did.</p>
+  </div>
+
+  <!-- CHART -->
+  <div class="chart-section">
+    <div class="chart-inner">
+      <div class="eyebrow-c">Chart 1 · Consumer Health Wearable Landscape · March 2026</div>
+      <div class="chart-h1">Global Wearable Shipments — Total Market, Smartwatches &amp; Smart Rings</div>
+      <div class="chart-sub">Annual units shipped (millions) · 2020–2028F · 2025P = preliminary · Forecast years = range bands</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchView('units',this)">Market Overview</div>
+        <div class="tab" onclick="switchView('rings',this)">Rings Detail</div>
+        <div class="tab" onclick="switchView('share',this)">Oura Share ★</div>
+        <div class="tab" onclick="switchView('oura',this)">Oura Revenue</div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="fcst-row"><div class="fcst-label">← verified &nbsp;|&nbsp; 2025P = preliminary &nbsp;|&nbsp; range forecast →</div></div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div id="chips-units" class="chips">
+        <div class="chip red"><div class="chip-icon">📉</div><div><b>2022: First-ever decline — 492.1M (–7.7%)</b>IDC: driven by basic wristband collapse. Premium health unaffected.</div></div>
+        <div class="chip teal"><div class="chip-icon">💍</div><div><b>Ring market: ~3–5M in 2024 (IDC: +88% YoY)</b>Oura ~1.3M (Sacra est.) + Samsung + others. Shown as range.</div></div>
+        <div class="chip blue"><div class="chip-icon">🏁</div><div><b>Samsung Galaxy Ring — Jul 2024</b>Expanded category awareness. Oura growth continued post-entry.</div></div>
+      </div>
+      <div id="chips-rings" class="chips" style="display:none">
+        <div class="chip teal"><div class="chip-icon">🔢</div><div><b>Ring market model</b>Anchor: Oura 5.5M lifetime by Sep 2025. IDC +88% YoY in 2024. 3–5M range reflects share uncertainty.</div></div>
+        <div class="chip gray"><div class="chip-icon">⚠️</div><div><b>IDC has never published a global ring unit total</b>Only growth rates. All estimates here are derived.</div></div>
+        <div class="chip blue"><div class="chip-icon">📈</div><div><b>Forecast: 15–30M range by 2028</b>Wide band reflects Apple Ring uncertainty, China entrants, medical expansion.</div></div>
+      </div>
+      <div id="chips-share" class="chips" style="display:none">
+        <div class="chip teal"><div class="chip-icon">🏆</div><div><b>Oura built the ring category — ~50% share in 2023</b>Category-creator advantage is the strategic moat.</div></div>
+        <div class="chip blue"><div class="chip-icon">📉</div><div><b>Share declining as market grows — this is the right story</b>Absolute units grow; share falls as Samsung/others validate the category.</div></div>
+        <div class="chip amber"><div class="chip-icon">⚠️</div><div><b>All share figures are modeled estimates</b>Neither Oura nor IDC discloses ring market share publicly.</div></div>
+      </div>
+      <div id="chips-oura" class="chips" style="display:none">
+        <div class="chip teal"><div class="chip-icon">💰</div><div><b>$500M+ revenue (2024) — confirmed</b>Oura press release Sep 2025. ~80% hardware · ~20% subscription.</div></div>
+        <div class="chip blue"><div class="chip-icon">🎯</div><div><b>$1B revenue target 2025 — CEO guidance</b>$900M Series E · $11B valuation Oct 2025 (Fidelity-led).</div></div>
+        <div class="chip gray"><div class="chip-icon">⚠️</div><div><b>Subscriber count not publicly disclosed</b>~2M is analyst consensus. Treat as directional.</div></div>
+      </div>
+      <span class="model-toggle" id="model-toggle" onclick="toggleModel()">▶ Show data model &amp; assumptions</span>
+      <div class="model-box" id="model-box">
+        <strong>Smartwatch units:</strong> Derived as ~30–32% of total wearables per year per IDC share commentary. ±10M margin.<br><br>
+        <strong>Smart ring market:</strong> Anchored to Oura 5.5M lifetime (Sep 2025) + IDC +88% YoY in 2024. 3–5M range for 2024.<br><br>
+        <strong>Forecast bands:</strong> ~30% CAGR base case. Wide band reflects Apple Ring (analyst speculation: 2028–2030), China OEM entry, medical classification risk.<br><br>
+        <strong>If challenged:</strong> "Ring market total is derived from Oura's own disclosed lifetime units and IDC's growth rate commentary."
+      </div>
+      <div class="stats-grid">
+        <div class="sc"><div class="sn">537.9M <span class="badge up">↑6.1%</span></div><div class="sl">2024 Total · IDC primary</div></div>
+        <div class="sc"><div class="sn">~557M <span class="badge neu">+4.1%</span></div><div class="sl">2025P · IDC forecast</div></div>
+        <div class="sc"><div class="sn">3–5M <span class="badge up">+88%</span></div><div class="sl">2024 Ring mkt · derived</div></div>
+        <div class="sc"><div class="sn">$11B <span class="badge up">val.</span></div><div class="sl">Oura Oct 2025 · Series E</div></div>
+      </div>
+      <div class="chart-source">
+        <span class="src-v">✓ IDC primary</span> — Worldwide Quarterly Wearable Device Tracker: BusinessWire Mar 2022, Mar 2024, Sep 2024, Dec 2024 &nbsp;·&nbsp;
+        <span class="src-v">✓ Oura primary</span> — BusinessWire Sep 2025: "ŌURA Surpasses 5.5 Million Rings Sold" · Sacra estimates 2024 &nbsp;·&nbsp;
+        <span class="src-e">~ Derived</span> — Smartwatch units, ring market, subscriber count: modeled estimates
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="section">
+    <div class="section-num">02</div>
+    <h2>The Business Model: Moat or Liability</h2>
+  </div>
+
+  <div class="prose">
+    <p>Oura operates a hardware-plus-subscription model: $299-399 for the ring, $6 per month for the membership that unlocks meaningful health insights. Revenue splits roughly 80% hardware and 20% subscription, but the subscription is the high-margin engine funding everything else: the research partnerships, the AI Advisor, clinical integrations with Stanford, UCLA, and UC Berkeley, and 30+ MDs and PhDs on staff.</p>
+    <p>The moat argument is real. The longer a member stays, the more personalized the system's understanding of their baseline becomes, and the harder it is to switch to a competitor starting from zero. That data lock-in, combined with the research infrastructure the subscription funds, creates compounding advantages that a no-subscription competitor simply cannot afford.</p>
+    <p>Competitive pressure comes from two directions. First, hardware commoditization: Samsung's Galaxy Ring launched July 2024 at $399 with no subscription; RingConn and Ultrahuman offer comparable hardware at $199-349 with no recurring fees. Second, platform control. If Apple launches a ring (analysts speculate about a 2028-2030 window), the integration with Apple Health, iPhone, and the broader ecosystem creates a distribution advantage Oura cannot replicate. An Apple ring would not need to be better hardware. It would need to be good enough hardware plus a superior intelligence layer built on a richer cross-device data stack.</p>
+    <p>Many investors actually think Apple entering the ring market would strengthen Oura's position. This is the Garmin pattern. When Apple Watch launched, serious endurance athletes did not switch. They went deeper with Garmin, which offered the specificity and data depth they needed. Apple expanded the total category, and the specialist thrived. If Oura builds the intelligence layer its data infrastructure makes possible, it occupies the same position: the product serious health users choose even after Apple validates the category.</p>
+    <p>The subscription survives only if the intelligence layer justifies it. A subscription to a measurement system is a hard sell when free alternatives measure the same metrics. A subscription to a health companion that knows you, improves over time, and guides you toward better outcomes is a different product entirely.</p>
+  </div>
+
+  <div class="pullquote">
+    <p>"Pay for measurement, and you're competing with free. Pay for a health companion that actually knows you, that's a different conversation."</p>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="section">
+    <div class="section-num">03</div>
+    <h2>The Hardware Advantage and the AI Opportunity It Creates</h2>
+  </div>
+
+  <div class="prose">
+    <p>The smart ring's core positioning advantage is compliance. A wearable that stays on 24/7 generates fundamentally different data than one you charge nightly. Oura's 5-8 day battery life eliminates the nightly charging ritual that causes most smartwatch users to miss their most valuable tracking window: sleep.</p>
+    <p>The Gen 4's Smart Sensing system (Oura reports 18 sensor pathways versus 8 in Gen 3, adjusting dynamically to individual finger geometry) produces physiological signal that is among the most accurate in consumer wearables. The finger has stronger blood flow than the wrist for PPG sensing. Skin temperature readings are more stable. HRV captured nightly during sleep produces cleaner signal than continuous wrist-based monitoring. These are the same advantages cited in Oura's research collaborations with Stanford and UC Berkeley.</p>
+    <p>Most health AI applications are data-starved. They rely on self-reported inputs, infrequent measurements, or noisy wrist-based signals. Oura has something rare: continuous, high-quality, longitudinal physiological data on millions of users, captured passively, with high compliance. That is the foundation for a genuinely intelligent health companion, if the product layer above it is built correctly.</p>
+    <p>The hardware advantage is real but not permanent. The window to build a durable intelligence moat on top of the best sensors in the category is open. It will not stay open indefinitely.</p>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="section">
+    <div class="section-num">04</div>
+    <h2>Where the Current Product Falls Short</h2>
+  </div>
+
+  <div class="prose">
+    <p>Oura's engagement numbers are strong by consumer subscription standards. The average member opens the app more than three times daily. Some industry analysts have estimated 12-month retention in the high 80s, exceptional for a hardware subscription product, though Oura does not disclose this figure publicly.</p>
+    <p>The dominant complaint across Reddit, product forums, and health communities is not about the hardware. It is about the gap between data and action. Users describe feeling like "a data collecting machine with no obvious next step, despite years of metrics." Oura threads are full of users asking whether they "actually know what to do" with readiness, HRV, and sleep scores. The common complaint is not "I don't have enough data." It is:</p>
+  </div>
+
+  <div class="pullquote">
+    <p>"I don't know which number matters right now or what to do differently today."</p>
+  </div>
+
+  <div class="prose">
+    <p><small style="color:var(--ink-muted);font-size:13px">(r/ouraring, r/AppleWatch, Quantified Self forums — a pattern that appears across wearable communities, not just Oura's)</small></p>
+  </div>
+
+  <div class="failures">
+    <div class="failure">
+      <div class="failure-icon">📉</div>
+      <div>
+        <div class="failure-title">The 4–6 week drop-off</div>
+        <div class="failure-body">A visible pattern among some users: they abandon daily score-checking once they realize the Readiness Score conflates acute stressors (a single hard workout) with chronic load, like accumulated sleep debt. The score declines; the user knows roughly why; the product offers no contextual interpretation. Trust erodes. Not a sensor problem. An interpretation problem.</div>
+      </div>
+    </div>
+    <div class="failure">
+      <div class="failure-icon">😰</div>
+      <div>
+        <div class="failure-title">Orthosomnia</div>
+        <div class="failure-body">The clinical term for sleep-score anxiety has entered health forums with growing frequency. Users report the data loop designed to improve behavior is triggering anxiety instead. A system that surfaces a low sleep score without distinguishing between a signal requiring behavioral change and normal variation has failed at its core job. It is generating worry, not guidance.</div>
+      </div>
+    </div>
+    <div class="failure">
+      <div class="failure-icon">🏋️</div>
+      <div>
+        <div class="failure-title">The workout accuracy gap</div>
+        <div class="failure-body">Many Gen 4 users report Oura's workout heart rate tracking significantly underperforms Apple Watch and Garmin during high-intensity intervals, recording Zone 0 ("at rest") during maximum-effort training. For an active user, Oura cannot serve as their primary training tool. They need a second device, raising the cost of the tracking stack and weakening the case for the subscription.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>What connects all three failure modes is the same root cause: exceptional data surfaced without the interpretive layer that makes it actionable. The AI Advisor is a meaningful step, but it remains primarily reactive, answering questions rather than anticipating needs. What Oura's data infrastructure makes possible is significantly more capable than what currently exists.</p>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="section">
+    <div class="section-num">05 — From here, analysis gives way to opinion. These are my product bets.</div>
+    <h2>What the Next Phase Requires: The Protocol Era</h2>
+  </div>
+
+  <div class="prose">
+    <p>The wearables industry has moved through two distinct phases and is entering a third.</p>
+  </div>
+
+  <div class="phases">
+    <div class="phase">
+      <div class="phase-label">Phase 1</div>
+      <div class="phase-title">The Logging Era</div>
+      <div class="phase-desc">Sensors and dashboards. Steps, calories, heart rate. Differentiation through form factor. Data was interesting but rarely actionable.</div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">Phase 2 — Current</div>
+      <div class="phase-title">The Insight Era</div>
+      <div class="phase-desc">Trend surfacing, plain-language summaries, sleep and readiness scores. Primarily informational. Oura is here today. So is every serious competitor.</div>
+    </div>
+    <div class="phase active">
+      <div class="phase-label">Phase 3 — Next Moat</div>
+      <div class="phase-title">The Protocol Era</div>
+      <div class="phase-desc">Closed loops: detect pattern → recommend action → track adherence → adapt. Condition-specific playbooks. Behavioral guidance that closes the loop.</div>
+      <div class="phase-badge">Where the moat lives</div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>The product architecture that Phase 3 requires, broken into its core building blocks:</p>
+  </div>
+
+  <div class="blocks">
+    <div class="block">
+      <div class="block-num">01</div>
+      <div><div class="block-title">Dynamic personal baselines</div><div class="block-body">Compare your metrics to you, not population norms. A model that accounts for training cycles, stress patterns, seasonal variation, and individual physiology. The Readiness Score becomes trustworthy when it reflects your body specifically.</div></div>
+    </div>
+    <div class="block">
+      <div class="block-num">02</div>
+      <div><div class="block-title">Proactive pattern recognition</div><div class="block-body">Surface patterns before the member experiences the consequence. "Your HRV trend suggests elevated illness probability within 48 hours, reduce training load today." "HRV suppression combined with three nights of sleep debt: this is the pattern that preceded your previous overreaching episodes."</div></div>
+    </div>
+    <div class="block">
+      <div class="block-num">03</div>
+      <div><div class="block-title">Contextual interpretation of anomalies</div><div class="block-body">When a score declines, explain why, distinguishing between a training adaptation signal, recovery deficit, early illness indicator, and expected variation from a known life event. Integrate workout logs, stress tags, travel, and illness history.</div></div>
+    </div>
+    <div class="block">
+      <div class="block-num">04</div>
+      <div><div class="block-title">Condition- and life-stage-specific protocol engines</div><div class="block-body">Domain-specific playbooks for metabolic recovery, training periodization, perimenopause, post-partum recovery, built from longitudinal outcome data and clinical evidence. Hard to replicate without both the data and the clinical infrastructure. Oura has both.</div></div>
+    </div>
+    <div class="block">
+      <div class="block-num">05</div>
+      <div><div class="block-title">Trust infrastructure</div><div class="block-body">All of this depends on the member trusting the guidance. Transparency about how interpretations are generated, honest uncertainty calibration, and a tone that is informative rather than alarmist. The orthosomnia problem is a product design problem: a system that generates anxiety has failed at trust, regardless of data accuracy.</div></div>
+    </div>
+  </div>
+
+  <!-- POV SECTION -->
+  <div class="pov-header">
+    <h2>A POV: What Oura Should Actually Build</h2>
+  </div>
+
+  <!-- OpenAI/Claude -->
+  <div class="section" style="margin-top:0">
+    <div class="section-num">The OpenAI and Claude Question</div>
+    <h2>Why general-purpose AI is not enough</h2>
+  </div>
+
+  <div class="prose">
+    <p>In January 2026, OpenAI launched ChatGPT Health on January 7. Anthropic followed with Claude for Healthcare four days later. Both now integrate directly with Apple Health and Android Health Connect. Both can access your wearable data, lab results, and health records. Both are available to hundreds of millions of users today.</p>
+    <p>So the obvious question: why does Oura need to build an intelligence layer at all? Why not let ChatGPT or Claude interpret the data?</p>
+    <p>The general-purpose AI companies can read your Oura data if you grant access. They can answer questions about your sleep score, explain what HRV means, and correlate your metrics with lifestyle inputs. What they cannot do is reason from a longitudinal dataset of millions of users calibrated specifically to the physiological signals a finger-worn ring captures, validated against clinical outcomes, refined over ten years.</p>
+    <p>ChatGPT Health is a generalist with access to your data. Oura's intelligence layer should be a specialist that has spent a decade building domain models no generalist can replicate. A generalist AI answering health questions is like a well-read friend. A specialist AI that has modeled HRV trajectories across 5.5 million users, correlated temperature disruption patterns with perimenopause onset across 100,000 women, and validated early illness detection against clinical outcomes is something categorically different.</p>
+    <p>The risk Oura cannot ignore: open-source projects like Open Wearables already let developers pipe Oura data directly into Claude or ChatGPT via MCP servers. Reddit threads are full of users who have built their own "chat with my Oura data" setups. The grassroots intelligence layer is being built around Oura, not by it. The window to build a proprietary intelligence layer genuinely better than what a user can assemble from ChatGPT and an API key is measured in months, not years, given the pace of open-source integrations already live today.</p>
+  </div>
+
+  <div class="stack">
+    <div class="stack-row sr-hardware">Hardware layer <span class="players">Oura Ring, Galaxy Ring, Apple Watch</span></div>
+    <div class="stack-arrow">↓</div>
+    <div class="stack-row sr-data">Data aggregation <span class="players">Apple Health, Android Health Connect, APIs</span></div>
+    <div class="stack-arrow">↓</div>
+    <div class="stack-row sr-intel highlight">Intelligence layer ★ <span class="players">← This is the battleground</span></div>
+    <div class="stack-arrow">↓</div>
+    <div class="stack-row sr-hardware">Daily health protocol <span class="players">"What should I do today?"</span></div>
+  </div>
+
+  <!-- Data Moat -->
+  <div class="section">
+    <div class="section-num">The Data Moat</div>
+    <h2>Sleep vs. fitness: where is the bigger play?</h2>
+  </div>
+
+  <div class="prose">
+    <p>Oura's data advantage is more specific than it is often described. What is genuinely defensible: longitudinal finger-based physiological data on millions of users, over years of continuous signal. The baseline models Oura can build (what normal HRV looks like for a 43-year-old woman three months post-partum versus one in early perimenopause versus one who strength trains four days a week) require that dataset. No API integration gives ChatGPT access to the population-level patterns underneath the individual data.</p>
+    <p>Also defensible: thirty-plus MDs and PhDs, active research collaborations with Stanford, UCLA, and UC Berkeley, and a proprietary women's health LLM currently in Oura Labs testing. These produce domain knowledge that takes years to build and cannot be purchased.</p>
+    <p>The moat is weaker in one specific area: fitness data. Oura's workout tracking underperforms Garmin and Apple Watch. If the intelligence layer needs to reason about training load, recovery, and performance adaptation, it needs accurate activity data. Right now, Oura often cannot distinguish Zone 2 from Zone 5 during a workout. That limits the depth of any training intelligence product.</p>
+    <p>My bet: <strong>start with sleep, own it completely, then expand into fitness once the activity tracking is credible.</strong> The sleep intelligence play is where Oura's data moat is deepest, the clinical research backing is strongest, and 75% of Oura Advisor conversations already go. Win that fully before spreading thin.</p>
+  </div>
+
+  <!-- Personas -->
+  <div class="section">
+    <div class="section-num">The Women's Opportunity</div>
+    <h2>The Most Underserved User in Wearables</h2>
+  </div>
+
+  <div class="prose">
+    <p>Women are Oura's fastest-growing segment. The fastest-growing cohort is women in their early twenties. But the most valuable long-term cohort, the one with the highest unmet need and the most complex physiology, is not being served at the level the infrastructure makes possible. The intelligence layer needs to be built around specific personas, because the "so what" of a health score is entirely different depending on who is asking. Three personas define the opportunity:</p>
+  </div>
+
+  <div class="personas">
+    <div class="persona">
+      <div class="persona-age">22</div>
+      <div class="persona-label">The Athletic Woman</div>
+      <div class="persona-need">Responds to performance signals, social comparison, streaks, and competition. Bought the ring because an influencer she follows wears one. Wants to know if she is improving. Shares her scores.</div>
+      <div>
+        <span class="persona-tag pt-blue">Social features</span>
+        <span class="persona-tag pt-blue">Gamification</span>
+        <span class="persona-tag pt-blue">Cycle-aware training</span>
+        <span class="persona-tag pt-blue">Fast feedback loops</span>
+      </div>
+    </div>
+    <div class="persona">
+      <div class="persona-age">44</div>
+      <div class="persona-label">Perimenopausal Woman</div>
+      <div class="persona-need">Her body is sending unfamiliar signals and she does not always know if what she is experiencing is normal, hormonal, or clinical. Time-starved. Wants clarity, not more data. One clear action, today.</div>
+      <div>
+        <span class="persona-tag pt-teal">Contextual interpretation</span>
+        <span class="persona-tag pt-teal">Peri-aware baseline</span>
+        <span class="persona-tag pt-teal">Calm, specific guidance</span>
+      </div>
+    </div>
+    <div class="persona">
+      <div class="persona-age">52</div>
+      <div class="persona-label">Postmenopausal Woman</div>
+      <div class="persona-need">Past the chaos of perimenopause. Focused on the next 30 years: strength, bone density, cardiovascular health, cognitive function. Reads the research. Wants evidence-based guidance calibrated for her body.</div>
+      <div>
+        <span class="persona-tag pt-forest">Strength protocols</span>
+        <span class="persona-tag pt-forest">Longevity focus</span>
+        <span class="persona-tag pt-forest">Post-meno baseline</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="prose">
+    <p>Of the three, the 44-year-old is the hardest to serve and the most urgent. Her body is generating unfamiliar signals at an unpredictable cadence. She does not know if what she is experiencing is normal, hormonal, or clinical. She is time-starved. She does not want more data. She wants someone to tell her what to do today, with enough context that she actually trusts it.</p>
+    <p>That is not a features problem. It is an architecture problem. The data Oura already has is sufficient to build a genuinely intelligent sleep coach for this user. The question is whether the product is designed to close the loop between signal and action, or whether it stays in the business of surfacing scores and waiting to be asked.</p>
+    <p>In the next post: what that product actually looks like, the architecture required to build it, and why no one else can.</p>
+  </div>
+
+  <!-- CONCLUSION -->
+  <div class="conclusion">
+    <div class="conclusion-hed">The first decade was measurement. The next decade is understanding.</div>
+    <div class="prose">
+      <p>Oura has the data. It has the hardware. It has the research depth and the clinical partnerships. The winner in wearables will not be the best sensor company. It will be the best health intelligence company.</p>
+      <p>The general-purpose AI companies are at the door. The open-source ecosystem is building workarounds. And users across Reddit, health forums, and years of wearable ownership are all asking the same question Oura has not yet answered at scale:</p>
+      <p><strong>What should I do today?</strong></p>
+      <p>The window is open. The question is whether the roadmap follows the logic.</p>
+    </div>
+  </div>
+
+  <!-- BYLINE -->
+  <div class="byline">
+    <div class="byline-dot">KK</div>
+    <div>
+      <div class="byline-name">Karen Kagoo</div>
+      <div class="byline-bio">Writes Her Health Stack, a newsletter covering the business and product strategy of women's health and fitness. Spent more than a decade at Google building platforms at scale.</div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+const labels=['2020','2021','2022','2023','2024','2025P','2026F','2027F','2028F'];
+const totalA=[444,533.6,492.1,506.5,537.9,null,null,null,null];
+const totalF_mid=[null,null,null,null,537.9,559,580,612,645.7];
+const totalF_low=[null,null,null,null,537.9,552,568,593,620];
+const totalF_hi=[null,null,null,null,537.9,566,595,632,675];
+const swA=[null,171,148,161,154,null,null,null,null];
+const swF_mid=[null,null,null,null,154,157,161,165,175];
+const ringA_mid=[null,null,0.7,2.0,4.3,null,null,null,null];
+const ringA_low=[null,null,0.5,1.5,3.0,null,null,null,null];
+const ringA_hi=[null,null,0.9,2.5,5.2,null,null,null,null];
+const ringF_mid=[null,null,null,null,4.3,7.5,11,16,22];
+const ringF_low=[null,null,null,null,4.3,5.5,8,12,15];
+const ringF_hi=[null,null,null,null,4.3,9.5,14,21,30];
+const ouraUnitsA=[null,null,null,1.0,1.3,null,null,null,null];
+const ouraUnitsF=[null,null,null,null,1.3,2.5,null,null,null];
+const ouraShareA=[null,null,null,50,30,null,null,null,null];
+const ouraShareF=[null,null,null,null,30,33,null,null,null];
+const ouraShare_low=[null,null,null,null,25,25,null,null,null];
+const ouraShare_hi=[null,null,null,null,43,42,null,null,null];
+const ouraRevA=[null,null,null,245,500,null,null,null,null];
+const ouraRevF_mid=[null,null,null,null,500,1000,null,null,null];
+const ouraRevF_low=[null,null,null,null,500,850,null,null,null];
+const ouraRevF_hi=[null,null,null,null,500,1100,null,null,null];
+const ouraSubA=[null,null,null,0.9,2.0,null,null,null,null];
+const ouraSubF=[null,null,null,null,2.0,3.5,null,null,null];
+
+let activeChart=null;
+function grad(ctx,c1,c2){const g=ctx.createLinearGradient(0,0,0,340);g.addColorStop(0,c1);g.addColorStop(1,c2);return g;}
+function solidDs(label,color,data,yAxisID,{w=2,dash=[],hollow=false,pr=5,fill=false,bg='transparent'}={}){
+  return{label,data,yAxisID:yAxisID||'y',borderColor:color,backgroundColor:bg,borderWidth:w,borderDash:dash,fill,tension:.35,spanGaps:false,pointRadius:pr,pointBackgroundColor:hollow?'#fff':color,pointBorderColor:hollow?color:'#fff',pointBorderWidth:2,pointHoverRadius:pr+2};}
+function bandDs(label,color,dataLow,dataHigh,yAxisID){
+  const alpha=color.includes('065F46')?'rgba(6,95,70,.12)':color.includes('1648C8')?'rgba(22,72,200,.10)':'rgba(100,100,100,.10)';
+  return[{label:'_low_'+label,data:dataLow,yAxisID:yAxisID||'y',borderColor:'transparent',backgroundColor:'transparent',borderWidth:0,fill:false,tension:.35,spanGaps:false,pointRadius:0,pointHoverRadius:0},{label:label+' (range)',data:dataHigh,yAxisID:yAxisID||'y',borderColor:'transparent',backgroundColor:alpha,borderWidth:0,fill:'-1',tension:.35,spanGaps:false,pointRadius:0,pointHoverRadius:0}];}
+function buildChart(datasets,scalesDef,legendItems){
+  if(activeChart)activeChart.destroy();
+  renderLegend(legendItems);
+  const ctx=document.getElementById('chart').getContext('2d');
+  activeChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#0D1117',titleFont:{family:'Sora',size:11,weight:'600'},bodyFont:{family:'Sora',size:11},padding:13,cornerRadius:9,filter:item=>!item.dataset.label.startsWith('_low_'),callbacks:{label:c=>c.raw===null?null:`  ${c.dataset.label}: ${c.raw}`}}},scales:buildScales(scalesDef)}});
+  addForecastShading(activeChart);
+  addAnnotation(activeChart,scalesDef);}
+function buildScales(def){
+  const s={x:{grid:{display:false},border:{display:false},ticks:{font:{family:'Sora',size:11},color:'#8896AA'}}};
+  const a=def.y;
+  s.y={min:a.min,max:a.max,position:'left',grid:{color:'#EEF1F6'},border:{display:false},ticks:{font:{family:'Sora',size:11},color:a.color,callback:v=>v===0?'':v+(a.dollar?'':'M'),stepSize:a.step},title:{display:true,text:a.label,font:{family:'Sora',size:10},color:a.color}};
+  if(def.y2){const b=def.y2;s.y2={min:b.min,max:b.max,position:'right',grid:{drawOnChartArea:false},border:{display:false},ticks:{font:{family:'Sora',size:11},color:b.color,callback:v=>v+(b.dollar?'':'M'),stepSize:b.step},title:{display:true,text:b.label,font:{family:'Sora',size:10},color:b.color}};}
+  return s;}
+function renderLegend(items){
+  document.getElementById('legend').innerHTML=items.map(i=>{
+    if(i.band)return`<div class="li"><div class="ll band" style="background:${i.color}"></div><span style="color:var(--ink-muted)">${i.label}</span></div>`;
+    return`<div class="li" style="color:${i.color}"><div class="ll${i.dash?' dash':''}" style="background:${i.dash?'':i.color};color:${i.color};height:${i.thick?'3.5px':'2px'}"></div><span style="color:var(--ink-mid)">${i.label}</span></div>`;
+  }).join('');}
+function addForecastShading(c){
+  const orig=c.draw.bind(c);
+  c.draw=function(){orig();const ctx2=c.ctx,xs=c.scales.x;const xMid=(xs.getPixelForValue(4)+xs.getPixelForValue(5))/2;const{top,bottom,right}=c.chartArea;ctx2.save();ctx2.fillStyle='rgba(22,72,200,.02)';ctx2.fillRect(xMid,top,right-xMid,bottom-top);ctx2.beginPath();ctx2.setLineDash([3,4]);ctx2.strokeStyle='rgba(22,72,200,.2)';ctx2.lineWidth=1;ctx2.moveTo(xMid,top);ctx2.lineTo(xMid,bottom);ctx2.stroke();ctx2.setLineDash([]);ctx2.font='600 9px Sora,sans-serif';ctx2.fillStyle='rgba(22,72,200,.35)';ctx2.textAlign='left';ctx2.fillText('RANGE FORECAST',xMid+6,top+14);ctx2.restore();};c.draw();}
+function addAnnotation(c,scalesDef){
+  const orig=c.draw.bind(c);
+  c.draw=function(){orig();const ctx2=c.ctx,xs=c.scales.x,ys=c.scales.y;const x=xs.getPixelForValue(4);const yPos=ys.getPixelForValue(scalesDef.y.annot||ys.min+(ys.max-ys.min)*.18);ctx2.save();ctx2.beginPath();ctx2.setLineDash([3,3]);ctx2.strokeStyle='rgba(22,72,200,.3)';ctx2.lineWidth=1;ctx2.moveTo(x,ys.top+24);ctx2.lineTo(x,yPos);ctx2.stroke();ctx2.setLineDash([]);const txt='Samsung Galaxy Ring — Jul 2024';ctx2.font='600 9.5px Sora,sans-serif';const tw=ctx2.measureText(txt).width;ctx2.fillStyle='#EEF2FF';ctx2.beginPath();ctx2.roundRect(x-tw/2-8,yPos,tw+16,18,4);ctx2.fill();ctx2.fillStyle='#1648C8';ctx2.textAlign='center';ctx2.fillText(txt,x,yPos+12.5);ctx2.restore();};c.draw();}
+function toggleModel(){const box=document.getElementById('model-box');const tog=document.getElementById('model-toggle');const show=box.classList.toggle('show');tog.textContent=(show?'▼':'▶')+' Show data model & assumptions';}
+function viewUnits(){const ctx=document.getElementById('chart').getContext('2d');const gB=grad(ctx,'rgba(22,72,200,.10)','rgba(22,72,200,0)');buildChart([solidDs('Total Market','#1648C8',totalA,'y',{w:2.5,fill:true,bg:gB,pr:5}),...bandDs('Total forecast','#1648C8',totalF_low,totalF_hi,'y'),solidDs('Total — midpoint (forecast)','#1648C8',totalF_mid,'y',{w:1.5,dash:[5,4],hollow:true,pr:3}),solidDs('Smartwatches [est.]','#92400E',swA,'y',{w:2,pr:5}),solidDs('Smartwatches forecast [est.]','#92400E',swF_mid,'y',{w:1.5,dash:[5,4],hollow:true,pr:3}),solidDs('Smart Rings [est., derived] →','#065F46',ringA_mid,'y2',{w:3,pr:6}),...bandDs('Ring estimate range','#065F46',ringA_low,ringA_hi,'y2'),solidDs('Rings forecast — base [est.]','#065F46',ringF_mid,'y2',{w:1.5,dash:[4,4],hollow:true,pr:3}),...bandDs('Ring forecast range','#065F46',ringF_low,ringF_hi,'y2')],{y:{min:0,max:720,label:'Total / Smartwatches (M units)',color:'#8896AA',step:120,annot:220},y2:{min:0,max:36,label:'Smart Rings → (M units, derived)',color:'#065F46',step:6}},[{label:'Total Market',color:'#1648C8',thick:true},{label:'Forecast range',color:'#1648C8',band:true},{label:'Smartwatches [est.]',color:'#92400E'},{label:'Rings [est.] →',color:'#065F46',thick:true},{label:'Ring range / forecast',color:'#065F46',band:true}]);}
+function viewRings(){const ctx=document.getElementById('chart').getContext('2d');const gO=grad(ctx,'rgba(22,72,200,.10)','rgba(22,72,200,0)');buildChart([...bandDs('Ring mkt range [est.]','#065F46',ringA_low,ringA_hi,'y'),solidDs('Ring Market — midpoint [est.]','#065F46',ringA_mid,'y',{w:3,fill:false,pr:7}),...bandDs('Ring forecast range [est.]','#065F46',ringF_low,ringF_hi,'y'),solidDs('Ring forecast — base [est.]','#065F46',ringF_mid,'y',{w:1.5,dash:[4,4],hollow:true,pr:3}),solidDs('Oura Units [est., Sacra 2024]','#1648C8',ouraUnitsA,'y',{w:2,fill:true,bg:gO,pr:5}),solidDs('Oura forecast [est.]','#1648C8',ouraUnitsF,'y',{w:1.5,dash:[5,4],hollow:true,pr:3})],{y:{min:0,max:26,label:'Units (M) — all figures estimated/derived',color:'#065F46',step:4,annot:1.5}},[{label:'Ring Market range [est.]',color:'#065F46',band:true},{label:'Ring midpoint [est.]',color:'#065F46',thick:true},{label:'Oura Units [est., Sacra]',color:'#1648C8'}]);}
+function viewShare(){buildChart([...bandDs('Oura share range [est.]','#065F46',ouraShare_low,ouraShare_hi,'y'),solidDs('Oura % of Ring Market [est.]','#065F46',ouraShareA,'y',{w:3,pr:7}),solidDs('Share forecast [est.]','#065F46',ouraShareF,'y',{w:1.5,dash:[4,4],hollow:true,pr:3})],{y:{min:0,max:100,label:'Oura share of ring market (%) — estimated',color:'#065F46',step:20,annot:15}},[{label:'Oura share range [est.]',color:'#065F46',band:true},{label:'Oura share midpoint [est.]',color:'#065F46',thick:true}]);}
+function viewOura(){const ctx=document.getElementById('chart').getContext('2d');const gR=grad(ctx,'rgba(6,95,70,.12)','rgba(6,95,70,0)');buildChart([solidDs('Oura Revenue $M','#065F46',ouraRevA,'y',{w:3,fill:true,bg:gR,pr:7}),...bandDs('Revenue forecast range','#065F46',ouraRevF_low,ouraRevF_hi,'y'),solidDs('Revenue — CEO guidance midpoint','#065F46',ouraRevF_mid,'y',{w:1.5,dash:[5,4],hollow:true,pr:3}),solidDs('Subscribers (M) [analyst est.] →','#1648C8',ouraSubA,'y2',{w:2,pr:5}),solidDs('Subs forecast [est.]','#1648C8',ouraSubF,'y2',{w:1.5,dash:[4,4],hollow:true,pr:3})],{y:{min:0,max:1400,label:'Revenue ($M)',color:'#065F46',step:200,dollar:true,annot:100},y2:{min:0,max:5,label:'Subscribers (M) [analyst est.] →',color:'#1648C8',step:1}},[{label:'Oura Revenue $M (verified)',color:'#065F46',thick:true},{label:'Revenue forecast range',color:'#065F46',band:true},{label:'Subscribers [analyst est.] →',color:'#1648C8'}]);}
+function switchView(view,el){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('[id^=chips-]').forEach(d=>d.style.display='none');document.getElementById('chips-'+view).style.display='flex';({units:viewUnits,rings:viewRings,share:viewShare,oura:viewOura}[view])();}
+viewUnits();
+</script>
+</body>
+</html>
